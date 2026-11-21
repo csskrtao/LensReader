@@ -11,5 +11,5 @@
     "isolatedModules": true,
     "types": ["@cloudflare/workers-types"]
   },
-  "include": [".", "../server/llm.ts", "../server/routes.ts", "../server/prompts.ts"]
+  "include": [".", "../server/llm.ts", "../server/routes.ts", "../server/prompts.ts", "../server/quick.ts"]
 }

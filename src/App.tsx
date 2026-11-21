@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { api } from './api';
+import { api, QUICK_BATCH } from './api';
 import ArticleView from './components/ArticleView';
 import ExplainPanel from './components/ExplainPanel';
 import HistoryDrawer, { HistoryList } from './components/HistoryDrawer';
@@ -11,7 +11,7 @@ import { mapLimit, mergePages } from './lib/merge';
 import { store } from './lib/store';
 import { buildStructure, EMPTY_STRUCTURE } from './lib/structure';
 import { buildDoc, contextOf, surroundingOf, textOf, uid } from './lib/tokenize';
-import type { Article, Layout, Mode, OcrPage, PanelState, PendingPage, Target, VocabItem, VocabKind } from './types';
+import type { Article, Layout, Mode, OcrPage, PanelState, PendingPage, QuickResult, Target, VocabItem, VocabKind } from './types';
 
 const MODES: { key: Mode; label: string; hint: string }[] = [
   { key: 'word', label: '点词', hint: '点击任意单词，查看它在本句中的意思、翻译和搭配' },
@@ -31,7 +31,12 @@ export default function App() {
   const [view, setView] = useState<'read' | 'vocab'>('read');
   const [mode, setMode] = useState<Mode>('word');
   const [showZh, setShowZh] = useState(false);
-  const [zhLoading, setZhLoading] = useState(false);
+  /** 逐句翻译进度：waiting = 还没有任何译文；refining = 已显示机翻，等待 AI 精翻 */
+  const [zhPhase, setZhPhase] = useState<null | 'waiting' | 'refining'>(null);
+  const [zhNote, setZhNote] = useState<string | null>(null);
+  /** 机翻结果（不持久化），AI 译文到达后被 article.translations 覆盖 */
+  const [quickZh, setQuickZh] = useState<Record<string, string>>({});
+  const zhReq = useRef(0);
   const [panel, setPanel] = useState<PanelState | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -80,9 +85,13 @@ export default function App() {
   function openArticle(a: Article | undefined) {
     if (!a) return;
     reqId.current++;
+    zhReq.current++;
     setArticle(a);
     setPanel(null);
     setShowZh(false);
+    setZhPhase(null);
+    setZhNote(null);
+    setQuickZh({});
     setView('read');
     setHistoryOpen(false);
     window.scrollTo({ top: 0 });
@@ -242,6 +251,19 @@ export default function App() {
       return;
     }
     setPanel({ target, loading: true });
+    // 同时请求词典 / 机翻，先垫上简单结果；失败静默忽略，只等 AI
+    const quick: Promise<QuickResult> =
+      target.kind === 'word'
+        ? api.quickWord(target.word).then((word) => ({ word }))
+        : api
+            .quickTranslate([{ id: 'q', text: target.kind === 'sentence' ? doc.sentences.get(target.sid)!.text : target.text }])
+            .then((r) => ({ zh: r.items.q }));
+    quick
+      .then((q) => {
+        if (id !== reqId.current || (!q.word && !q.zh)) return;
+        setPanel((p) => (p && p.target === target && !p.data ? { ...p, quick: q } : p));
+      })
+      .catch(() => {});
     try {
       let data: any;
       if (target.kind === 'word') {
@@ -254,7 +276,8 @@ export default function App() {
       store.setCache(a.id, key, data);
       if (id === reqId.current) setPanel({ target, data });
     } catch (e: any) {
-      if (id === reqId.current) setPanel({ target, error: e.message || String(e) });
+      // 保留已显示的快速结果，下方提示出错并可重试
+      if (id === reqId.current) setPanel((p) => ({ target, error: e.message || String(e), quick: p?.target === target ? p.quick : undefined }));
     }
   }
 
@@ -289,24 +312,51 @@ export default function App() {
     const a = articleRef.current;
     if (!a || !doc) return;
     if (a.translations && doc.order.every((s) => a.translations![s.id])) return setShowZh(true);
-    setZhLoading(true);
+    if (zhPhase) return setShowZh(true); // 正在翻译：只是重新显示
+    const tok = ++zhReq.current;
+    const isCur = () => tok === zhReq.current;
+    setZhPhase('waiting');
+    setZhNote(null);
+
+    // 先用机翻：按组并发，每组返回就显示
+    const missing = doc.order.filter((s) => !a.translations?.[s.id]);
+    const chunks: (typeof missing)[] = [];
+    for (let i = 0; i < missing.length; i += QUICK_BATCH) chunks.push(missing.slice(i, i + QUICK_BATCH));
+    let quickGot = 0;
+    const quickDone = mapLimit(chunks, 4, async (c) => {
+      try {
+        const r = await api.quickTranslate(c.map((s) => ({ id: s.id, text: s.text })));
+        if (!isCur() || !Object.keys(r.items).length) return;
+        quickGot += Object.keys(r.items).length;
+        setQuickZh((q) => ({ ...q, ...r.items }));
+        setShowZh(true);
+        setZhPhase((p) => (p === 'waiting' ? 'refining' : p));
+      } catch {
+        /* 机翻失败：静默，只等 AI */
+      }
+    });
+
+    // 同时请求 AI 翻译（整篇一起发，保留上下文）
     try {
       const r = await api.translate(doc.order.map((s) => ({ id: s.id, text: s.text })));
       const cur = articleRef.current;
-      if (cur?.id === a.id) {
+      if (isCur() && cur?.id === a.id) {
         commit({ ...cur, translations: { ...cur.translations, ...r.items } });
         setShowZh(true);
       }
     } catch (e: any) {
-      alert('翻译失败：' + (e.message || e));
+      await quickDone;
+      if (!isCur()) return;
+      if (quickGot) setZhNote('AI 翻译失败，当前显示的是机器翻译');
+      else alert('翻译失败：' + (e.message || e));
     } finally {
-      setZhLoading(false);
+      if (isCur()) setZhPhase(null);
     }
   }
 
   function savedKey(p: PanelState): { kind: VocabKind; text: string } {
     const t = p.target;
-    if (t.kind === 'word') return { kind: 'word', text: (p.data?.word as string) || t.word };
+    if (t.kind === 'word') return { kind: 'word', text: (p.data?.word as string) || p.quick?.word?.lemma || t.word };
     if (t.kind === 'range') return { kind: 'phrase', text: t.text };
     return { kind: 'sentence', text: doc?.sentences.get(t.sid)?.text || '' };
   }
@@ -384,9 +434,12 @@ export default function App() {
           </div>
         )}
         {reading && (
-          <button className={showZh ? 'btn on' : 'btn'} onClick={toggleZh} disabled={zhLoading}>
-            {zhLoading ? '翻译中…' : showZh ? '隐藏译文' : '逐句翻译'}
+          <button className={showZh ? 'btn on' : 'btn'} onClick={toggleZh} disabled={zhPhase === 'waiting'}>
+            {zhPhase === 'waiting' ? '翻译中…' : showZh ? '隐藏译文' : '逐句翻译'}
           </button>
+        )}
+        {reading && showZh && (zhPhase === 'refining' || zhNote) && (
+          <span className={zhNote ? 'zh-status warn' : 'zh-status'}>{zhNote || 'AI 精翻中…'}</span>
         )}
         {reading && (
           <div className="seg layout-toggle" title="讲解面板的位置">
@@ -451,6 +504,7 @@ export default function App() {
               article={article}
               mode={mode}
               showZh={showZh}
+              quickZh={quickZh}
               target={panel?.target ?? null}
               flashSid={flashSid}
               structure={structure}

@@ -1,6 +1,7 @@
 /** 与运行环境无关的 AI 接口：本地 Express（server/index.ts）和 Cloudflare Worker（worker/index.ts）共用 */
 import type { LLM } from './llm';
 import * as P from './prompts';
+import { QUICK_BATCH, quickTranslate, quickWord } from './quick';
 
 export type Handler = (body: any, llm: LLM) => Promise<any>;
 
@@ -79,6 +80,16 @@ export const routes: Record<string, Handler> = {
       { role: 'system', content: P.RANGE_PROMPT },
       { role: 'user', content: `划线内容：${str(b.text, 'text')}\n所在句子：${str(b.context, 'context')}` },
     ]),
+
+  // 快速结果（词典 / 机翻），不经过 AI
+  '/quick/word': (b) => quickWord(str(b.word, 'word')),
+
+  '/quick/translate': async (b) => {
+    const items = (Array.isArray(b.items) ? b.items : []) as { id: string; text: string }[];
+    if (!items.length) throw new Error('缺少参数 items');
+    if (items.length > QUICK_BATCH) throw new Error(`items 单次最多 ${QUICK_BATCH} 条`);
+    return { items: await quickTranslate(items) };
+  },
 };
 
 /**

@@ -47,11 +47,28 @@ export type Target =
   | { kind: 'sentence'; sid: string }
   | { kind: 'range'; hid: string; start: number; end: number; text: string };
 
+/** 词典查词的快速结果（有道词典，查不到时谷歌翻译兜底） */
+export interface QuickWord {
+  word: string;
+  lemma?: string;
+  phonetic?: string;
+  ukphonetic?: string;
+  meanings: { pos: string; tran: string }[];
+  exam: string[];
+}
+
+/** AI 讲解返回前先显示的快速结果：单词用 word，句子 / 划线用 zh（机翻） */
+export interface QuickResult {
+  word?: QuickWord;
+  zh?: string;
+}
+
 export interface PanelState {
   target: Target;
   loading?: boolean;
   error?: string;
   data?: any;
+  quick?: QuickResult;
 }
 
 export type VocabKind = 'word' | 'phrase' | 'sentence';

@@ -459,3 +459,21 @@ body.resizing { user-select: none; cursor: grabbing; }
 @media (max-width: 899px) {
   .layout-toggle { display: none; }
 }
+
+/* ---------- 快速结果（词典 / 机翻） ---------- */
+.mt-tag {
+  display: inline-block; margin-left: 8px; padding: 0 6px; border-radius: 5px;
+  font-size: 11px; line-height: 18px; font-weight: 400; vertical-align: 2px;
+  background: #fef3c7; color: #92400e; white-space: nowrap;
+}
+.quick-card { padding-bottom: 4px; }
+.quick-lemma { margin: 4px 0 0; font-size: 13px; }
+.quick-means { list-style: none; margin: 8px 0 0; padding: 0; }
+.quick-means li { display: flex; gap: 8px; align-items: baseline; margin: 4px 0; }
+.quick-means .tag { flex-shrink: 0; }
+.quick-exam { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+.skeleton.compact { margin-top: 10px; padding-top: 4px; border-top: 1px dashed var(--line); }
+.skeleton.compact div { width: 55%; }
+.zh.quick { color: #78716c; border-left-color: #fde68a; }
+.zh-status { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.zh-status.warn { color: #b45309; }

@@ -8,6 +8,8 @@ interface Props {
   article: Article;
   mode: Mode;
   showZh: boolean;
+  /** 机翻结果，AI 译文（article.translations）没有时显示 */
+  quickZh: Record<string, string>;
   target: Target | null;
   flashSid: string | null;
   structure: Structure; // 点句时的成分划分（用于在原句中上色）
@@ -23,7 +25,7 @@ const tokenIndexOf = (el: Element | null): number | null => {
 };
 
 export default function ArticleView(props: Props) {
-  const { doc, article, mode, showZh, target, flashSid, structure } = props;
+  const { doc, article, mode, showZh, quickZh, target, flashSid, structure } = props;
   const box = useRef<HTMLDivElement>(null);
 
   // 划线：拖拽中的范围 / “先点起点再点终点”的起点
@@ -202,7 +204,16 @@ export default function ArticleView(props: Props) {
             {para.map((sen) => (
               <div key={sen.id} className="sent-block">
                 {renderSentence(sen)}
-                <div className="zh">{article.translations?.[sen.id] || '（暂无译文）'}</div>
+                {article.translations?.[sen.id] ? (
+                  <div className="zh">{article.translations[sen.id]}</div>
+                ) : quickZh[sen.id] ? (
+                  <div className="zh quick">
+                    {quickZh[sen.id]}
+                    <span className="mt-tag">机翻</span>
+                  </div>
+                ) : (
+                  <div className="zh">（暂无译文）</div>
+                )}
               </div>
             ))}
           </div>

@@ -1,4 +1,7 @@
-import type { OcrPage, RangeExp, SentenceExp, WordExp } from './types';
+import type { OcrPage, QuickWord, RangeExp, SentenceExp, WordExp } from './types';
+
+/** 快速翻译单次最多的句数（与后端 server/quick.ts 的 QUICK_BATCH 一致） */
+export const QUICK_BATCH = 25;
 
 const CODE_KEY = 'lensreader:access-code';
 
@@ -47,6 +50,9 @@ export const api = {
   word: (word: string, sentence: string) => post<WordExp>('/explain/word', { word, sentence }),
   sentence: (sentence: string, context: string) => post<SentenceExp>('/explain/sentence', { sentence, context }),
   range: (text: string, context: string) => post<RangeExp>('/explain/range', { text, context }),
+  quickWord: (word: string) => post<QuickWord>('/quick/word', { word }),
+  quickTranslate: (items: { id: string; text: string }[]) =>
+    post<{ items: Record<string, string> }>('/quick/translate', { items }),
   lan: async (): Promise<{ ips: string[] }> => {
     const r = await fetch('/api/lan').catch(() => null);
     return r?.ok ? r.json() : { ips: [] };

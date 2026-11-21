@@ -5,11 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n server,web -c blue,green \"tsx watch server/index.ts\" \"vite\"",
-    "build": "vite build",
+    "build": "node scripts/clean-dist.mjs && vite build",
     "start": "tsx server/index.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
-    "cf:dev": "vite build && wrangler dev",
-    "deploy": "vite build && wrangler deploy"
+    "cf:dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "dotenv": "^18.0.10",

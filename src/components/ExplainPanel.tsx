@@ -1,7 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { clauseCloses, clauseOpens, tokenStruct, withLabel, wsStruct } from './structureRender';
 import { clauseLabel, innerLabel, roleInfo, type Structure } from '../lib/structure';
-import type { Comp, Doc, Layout, PanelState, RangeExp, SentenceExp, VocabKind, WordExp } from '../types';
+import type { Comp, Doc, Layout, PanelState, QuickResult, RangeExp, SentenceExp, VocabKind, WordExp } from '../types';
 
 interface Props {
   panel: PanelState;
@@ -55,6 +55,48 @@ function PairList({ list, a, b }: { list?: any[]; a: string; b: string }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** AI 讲解返回前先显示的词典 / 机翻结果 */
+function QuickCard({ q }: { q: QuickResult }) {
+  const w = q.word;
+  return (
+    <div className="quick-card">
+      {w ? (
+        <>
+          <div className="ex-head">
+            <span className="ex-title">{w.word}</span>
+            {w.phonetic && <span className="phonetic">美 {w.phonetic}</span>}
+            {w.ukphonetic && w.ukphonetic !== w.phonetic && <span className="phonetic">英 {w.ukphonetic}</span>}
+            <span className="mt-tag">词典</span>
+          </div>
+          {w.lemma && <p className="muted quick-lemma">原形：{w.lemma}</p>}
+          <ul className="quick-means">
+            {w.meanings.map((m, k) => (
+              <li key={k}>
+                {m.pos && <span className="tag">{m.pos}</span>}
+                <span>{m.tran}</span>
+              </li>
+            ))}
+          </ul>
+          {w.exam.length > 0 && (
+            <div className="quick-exam">
+              {w.exam.map((e) => (
+                <span key={e} className="tag">
+                  {e}
+                </span>
+              ))}
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="big-zh">
+          {q.zh}
+          <span className="mt-tag">机翻</span>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -209,7 +251,7 @@ function RangeCard({ d, text }: { d: RangeExp; text: string }) {
 
 export default function ExplainPanel({ panel, doc, layout, structure, saved, onToggleSave, onDeleteHighlight, onRetry, onClose }: Props) {
   const [collapsed, setCollapsed] = useState(false);
-  const { target, data, loading, error } = panel;
+  const { target, data, loading, error, quick } = panel;
 
   const headText =
     target.kind === 'word'
@@ -247,7 +289,18 @@ export default function ExplainPanel({ panel, doc, layout, structure, saved, onT
   }
 
   function save() {
-    if (!data) return;
+    if (!data) {
+      // 只有快速结果时也能收藏，释义取词典 / 机翻
+      if (!quick) return;
+      if (target.kind === 'word' && quick.word) {
+        const w = quick.word;
+        const meaning = w.meanings.map((m) => (m.pos ? m.pos + ' ' : '') + m.tran).join('；');
+        onToggleSave('word', w.lemma || target.word, meaning, w.phonetic);
+      } else if (quick.zh) {
+        onToggleSave(target.kind === 'range' ? 'phrase' : 'sentence', headText, quick.zh);
+      }
+      return;
+    }
     if (target.kind === 'word') {
       const d = data as WordExp;
       onToggleSave('word', d.word || target.word, d.translation || '', [d.phonetic, d.pos].filter(Boolean).join(' '));
@@ -268,7 +321,7 @@ export default function ExplainPanel({ panel, doc, layout, structure, saved, onT
           {headText}
         </span>
         <div className="panel-actions">
-          {data && (
+          {(data || quick) && (
             <button className={saved ? 'btn small on' : 'btn small'} onClick={save}>
               {saved ? '★ 已收藏' : '☆ 加入生词本'}
             </button>
@@ -288,14 +341,21 @@ export default function ExplainPanel({ panel, doc, layout, structure, saved, onT
       </div>
       {!collapsed && (
         <div className="panel-body">
-          {loading && (
-            <div className="skeleton">
-              <div />
-              <div />
-              <div />
-              <p className="muted">AI 正在讲解……</p>
-            </div>
-          )}
+          {quick && !data && <QuickCard q={quick} />}
+          {loading &&
+            (quick ? (
+              <div className="skeleton compact">
+                <div />
+                <p className="muted">AI 正在精讲……</p>
+              </div>
+            ) : (
+              <div className="skeleton">
+                <div />
+                <div />
+                <div />
+                <p className="muted">AI 正在讲解……</p>
+              </div>
+            ))}
           {error && (
             <div className="error">
               <p>出错了：{error}</p>
