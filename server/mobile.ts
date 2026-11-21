@@ -32,7 +32,10 @@ function broadcast(s: Session, event: string, data: unknown) {
 
 const isPrivate = (ip: string) =>
   ip.startsWith('192.168.') || ip.startsWith('10.') || /^172\.(1[6-9]|2\d|3[01])\./.test(ip);
-const isVirtual = (name: string) => /vethernet|vmware|virtualbox|vbox|wsl|hyper-v|docker|loopback|tailscale|zerotier/i.test(name);
+const isVirtual = (name: string, ip: string) =>
+  /vethernet|vmware|virtualbox|vbox|wsl|hyper-v|docker|loopback|tailscale|zerotier|mihomo|clash|wintun|\btun\b|sing-box|v2ray/i.test(name) ||
+  /^198\.1[89]\./.test(ip); // 代理软件 TUN 网卡常用的 fake-ip 段
+const isPhysical = (name: string) => /wlan|wi-?fi|无线|以太网|ethernet|^en\d|^eth\d|^wl/i.test(name);
 
 function lanIps(): string[] {
   const list: { ip: string; score: number }[] = [];
@@ -42,7 +45,8 @@ function lanIps(): string[] {
       let score = 0;
       if (isPrivate(a.address)) score += 2;
       if (a.address.startsWith('192.168.')) score += 1;
-      if (isVirtual(name)) score -= 4;
+      if (isPhysical(name)) score += 2;
+      if (isVirtual(name, a.address)) score -= 6;
       list.push({ ip: a.address, score });
     }
   }

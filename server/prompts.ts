@@ -1,17 +1,27 @@
 export const OCR_PROMPT = `You are a precise OCR and text-structuring engine. The image contains an English article (for example a photo of a book page, an exam paper or a screen). It may be only ONE page of a longer article that continues across several photos.
 Tasks:
-1. Transcribe the English article text exactly as written. Do not translate, summarize, or rewrite the author's wording.
+1. Transcribe ONLY the body text of the main English article (its title and its paragraphs), exactly as written. Do not translate, summarize, or rewrite the author's wording.
 2. Re-join words hyphenated across line breaks (e.g. "impor-\\ntant" -> "important") and merge lines that belong to the same paragraph.
-3. Ignore page numbers, running headers/footers, watermarks and non-English decorations. If the article has a title, put it in "title"; otherwise use "".
-4. Split each paragraph into sentences. Keep the sentence-ending punctuation and quotation marks with the sentence.
-5. Text may be cut off at the page edges. Transcribe a cut-off fragment as-is (keep a trailing hyphen if the last word is split), never complete or drop it, and report the page boundaries:
+3. Leave out everything that is not part of the article itself, even if it is English, for example:
+   - page numbers, running headers/footers, book/chapter/unit names in the margins, section labels such as "Passage B" or "Text 2", source/copyright lines, watermarks;
+   - exam or textbook instructions (e.g. "Read the passage and answer the questions", "阅读下面短文……"), question numbers, comprehension questions, answer options (A. B. C. D.), answer sheets, scores;
+   - word lists, glossaries, footnotes and annotations explaining words (e.g. "*resilient: 有韧性的"), "New words" boxes, exercises and tasks after the passage;
+   - image captions, labels inside pictures, charts, ads, sidebars and pull quotes that repeat the text;
+   - handwriting, pen/pencil marks, underlining, notes or translations written by a reader;
+   - on-screen interface text (app/browser bars, buttons, time, battery, chat names, "Read more", like/share counts);
+   - text from a neighbouring page or a different article that is only partly visible at the edges.
+   If the image shows several separate articles, transcribe only the main one (the one that takes up most of the image / is in focus).
+   In a cloze passage, replace a numbered blank such as "__21__" or "(21)______" with "____"; drop footnote markers such as "¹" or "*" attached to words.
+4. Put the article's title in "title" if it has one; otherwise use "". Never use an instruction, a section label or a header as the title.
+5. Split each paragraph into sentences. Keep the sentence-ending punctuation and quotation marks with the sentence.
+6. The main article's own text may be cut off at the page edges (unlike unrelated text at the edges, keep it). Transcribe a cut-off fragment as-is (keep a trailing hyphen if the last word is split), never complete or drop it, and report the page boundaries:
    - "starts_mid_sentence": true if the first text on the page continues a sentence from a previous page (e.g. it begins with a lowercase word or the rest of a hyphenated word).
    - "starts_mid_paragraph": true if the first paragraph continues a paragraph from a previous page (e.g. its first line is not indented while other paragraphs are, or it starts mid-sentence).
    - "ends_mid_sentence": true if the last sentence is cut off at the bottom of the page.
    - "ends_mid_paragraph": true if the last paragraph seems to continue on the next page (e.g. its last line runs to the right margin, or it ends mid-sentence).
 Return ONLY a JSON object of this shape:
 {"title": "string", "paragraphs": [["sentence 1", "sentence 2"], ["sentence 1 of paragraph 2"]], "starts_mid_sentence": false, "starts_mid_paragraph": false, "ends_mid_sentence": false, "ends_mid_paragraph": false}
-If the image contains no readable English text, return {"title": "", "paragraphs": []}.`;
+If the image contains no readable English article text, return {"title": "", "paragraphs": []}.`;
 
 export const TRANSLATE_PROMPT = `你是专业的英汉翻译。用户会给出一个 JSON 数组，每一项 {"id", "text"} 是一篇英语文章中按顺序排列的句子。
 请结合上下文把每一句翻译成自然、准确的简体中文，逐句对应，不要合并、拆分或遗漏。

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import { prepareImage } from '../lib/image';
+import Cropper from './Cropper';
 import { uid } from '../lib/tokenize';
 
 type Status = 'queued' | 'uploading' | 'done' | 'error';
@@ -23,9 +24,12 @@ export default function MobileCapture({ sessionId }: { sessionId: string }) {
   const album = useRef<HTMLInputElement>(null);
   const running = useRef(false);
   const shotsRef = useRef<Shot[]>([]); // 上传循环读写的唯一数据源，同步到 state 用于渲染
+  // 拍完先裁剪，只保留文章区域；排队逐张处理
+  const [toCrop, setToCrop] = useState<{ files: File[]; done: number }>({ files: [], done: 0 });
+  const [autoCrop, setAutoCrop] = useState(() => localStorage.getItem('er:m-crop') !== 'off');
 
   useEffect(() => {
-    document.title = '手机拍照上传 · 拍照精读';
+    document.title = '手机拍照上传 · LensReader';
     api
       .mobileHello(sessionId)
       .then(() => setState('ok'))
@@ -75,6 +79,18 @@ export default function MobileCapture({ sessionId }: { sessionId: string }) {
     pump();
   }
 
+  function pick(files: File[]) {
+    if (!files.length) return;
+    if (!autoCrop) return add(files);
+    setToCrop((q) => (q.files.length ? { ...q, files: [...q.files, ...files] } : { files, done: 0 }));
+  }
+
+  /** 处理完裁剪队列的第一张：file 为要上传的图，null 表示放弃 */
+  function cropNext(file: File | null) {
+    if (file) add([file]);
+    setToCrop((q) => ({ files: q.files.slice(1), done: q.done + 1 }));
+  }
+
   function retry(id: string) {
     patch(id, { status: 'queued' });
     pump();
@@ -98,7 +114,7 @@ export default function MobileCapture({ sessionId }: { sessionId: string }) {
   return (
     <div className="m-page">
       <header className="m-head">
-        <b>拍照精读 · 手机上传</b>
+        <b>LensReader · 手机上传</b>
         <span className={`m-dot ${state === 'ok' ? 'on' : ''}`}>{state === 'ok' ? '已连接电脑' : '连接中…'}</span>
       </header>
 
@@ -111,7 +127,7 @@ export default function MobileCapture({ sessionId }: { sessionId: string }) {
         onChange={(e) => {
           const fs = imagesOf(e.target.files);
           e.target.value = '';
-          add(fs);
+          pick(fs);
         }}
       />
       <input
@@ -123,7 +139,7 @@ export default function MobileCapture({ sessionId }: { sessionId: string }) {
         onChange={(e) => {
           const fs = imagesOf(e.target.files);
           e.target.value = '';
-          add(fs);
+          pick(fs);
         }}
       />
 
@@ -135,9 +151,21 @@ export default function MobileCapture({ sessionId }: { sessionId: string }) {
         从相册选择（可多选）
       </button>
 
+      <label className="m-opt">
+        <input
+          type="checkbox"
+          checked={autoCrop}
+          onChange={(e) => {
+            setAutoCrop(e.target.checked);
+            localStorage.setItem('er:m-crop', e.target.checked ? 'on' : 'off');
+          }}
+        />
+        拍完后裁剪（只框住文章正文，识别更准）
+      </label>
+
       <p className="m-status">
         {shots.length === 0
-          ? '按页码顺序逐页拍摄，每拍一张会自动发送到电脑'
+          ? '按页码顺序逐页拍摄，每张确认后会自动发送到电脑'
           : busy
             ? `正在发送…（已发送 ${done} / ${shots.length} 张）`
             : `已发送 ${done} 张，可以继续拍；拍完回到电脑点「识别」`}
@@ -160,6 +188,18 @@ export default function MobileCapture({ sessionId }: { sessionId: string }) {
             </li>
           ))}
         </ol>
+      )}
+
+      {toCrop.files.length > 0 && (
+        <Cropper
+          key={toCrop.done}
+          file={toCrop.files[0]}
+          label={toCrop.done + toCrop.files.length > 1 ? `裁剪 第 ${toCrop.done + 1} / ${toCrop.done + toCrop.files.length} 张` : '裁剪照片'}
+          cancelText="放弃这张"
+          onCancel={() => cropNext(null)}
+          onOriginal={() => cropNext(toCrop.files[0])}
+          onDone={(f) => cropNext(f)}
+        />
       )}
     </div>
   );

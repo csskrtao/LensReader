@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PendingPage } from '../types';
+import Cropper from './Cropper';
 
 interface Props {
   busy: boolean;
@@ -12,16 +13,18 @@ interface Props {
   onClear: () => void;
   onStart: () => void;
   onPhone: () => void;
+  onReplace: (id: string, file: File) => void;
 }
 
 const imagesOf = (list: FileList | File[] | undefined | null) =>
   Array.from(list || []).filter((f) => f.type.startsWith('image/'));
 
-export default function Uploader({ busy, progress, error, pages, onAdd, onRemove, onMove, onClear, onStart, onPhone }: Props) {
+export default function Uploader({ busy, progress, error, pages, onAdd, onRemove, onMove, onClear, onStart, onPhone, onReplace }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
   const [dragTo, setDragTo] = useState<number | null>(null);
+  const [cropping, setCropping] = useState<PendingPage | null>(null);
 
   // 支持直接 Ctrl+V 粘贴截图（可多次粘贴，依次追加）
   useEffect(() => {
@@ -131,6 +134,11 @@ export default function Uploader({ busy, progress, error, pages, onAdd, onRemove
                 <img src={p.url} alt={`第 ${i + 1} 页`} draggable={false} />
                 <span className="page-no">{i + 1}</span>
                 {!busy && (
+                  <button className="page-crop" title="裁剪：只保留文章区域" onClick={() => setCropping(p)}>
+                    ✂
+                  </button>
+                )}
+                {!busy && (
                   <button className="page-del" title="移除" onClick={() => onRemove(p.id)}>
                     ✕
                   </button>
@@ -163,6 +171,18 @@ export default function Uploader({ busy, progress, error, pages, onAdd, onRemove
             </button>
           </div>
         </div>
+      )}
+
+      {cropping && (
+        <Cropper
+          file={cropping.file}
+          label={`裁剪 第 ${pages.findIndex((p) => p.id === cropping.id) + 1} 页`}
+          onCancel={() => setCropping(null)}
+          onDone={(f) => {
+            if (f !== cropping.file) onReplace(cropping.id, f);
+            setCropping(null);
+          }}
+        />
       )}
     </div>
   );

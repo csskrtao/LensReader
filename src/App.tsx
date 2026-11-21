@@ -159,6 +159,13 @@ export default function App() {
     setPending((cur) => cur.filter((x) => x.id !== id));
   }
 
+  function replacePending(id: string, file: File) {
+    const old = pending.find((p) => p.id === id);
+    if (old) URL.revokeObjectURL(old.url);
+    const url = URL.createObjectURL(file);
+    setPending((cur) => cur.map((p) => (p.id === id ? { ...p, file, url } : p)));
+  }
+
   function movePending(from: number, to: number) {
     setPending((cur) => {
       if (to < 0 || to >= cur.length) return cur;
@@ -365,7 +372,7 @@ export default function App() {
     <div className={`app layout-${layout} ${panel && reading ? 'has-panel' : ''}`}>
       <header className="topbar" ref={header}>
         <div className="brand" onClick={() => { setView('read'); setArticle(null); setPanel(null); }}>
-          拍照精读
+          LensReader
         </div>
         {reading && (
           <div className="seg modes">
@@ -467,6 +474,7 @@ export default function App() {
             )}
             <Uploader
               onPhone={openPhone}
+              onReplace={replacePending}
               busy={uploading}
               progress={uploadProgress}
               error={uploadError}
