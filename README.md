@@ -37,3 +37,17 @@ npm run dev            # 打开 http://localhost:5173
 ```bash
 npm run build && npm start   # 后端同时托管前端，访问 http://localhost:8787
 ```
+
+## 部署到 Cloudflare
+
+整体部署成一个 Cloudflare Worker（前端 + AI 接口 + 手机拍照会话），线上地址：https://lensreader.skrtao.de
+
+```bash
+npx wrangler login                          # 首次：浏览器授权 Cloudflare 账号
+npx wrangler secret put OPENAI_API_KEY      # 首次：设置密钥
+npx wrangler secret put OPENAI_BASE_URL     # OpenAI 官方可跳过
+npx wrangler secret put ACCESS_CODE         # 访问口令，强烈建议设置，否则任何人都能用你的 Key
+npm run deploy                              # 构建并部署，之后每次更新只需这一步
+```
+
+线上版扫码拍照直接使用当前域名，手机不需要和电脑连同一 WiFi。架构、域名配置、日常维护、访问口令和本地模拟等详细说明见 [docs/deploy-cloudflare.md](docs/deploy-cloudflare.md)。

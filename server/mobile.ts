@@ -1,6 +1,7 @@
 import type { Express, Response } from 'express';
 import crypto from 'node:crypto';
 import os from 'node:os';
+import { ACCESS_DENIED, ACCESS_HEADER, checkAccess } from './routes';
 
 /** 手机扫码拍照 → 电脑网页：会话保存在内存，图片经 SSE 推给电脑端 */
 
@@ -53,12 +54,16 @@ function lanIps(): string[] {
   return list.sort((x, y) => y.score - x.score).map((x) => x.ip);
 }
 
-export function mountMobile(app: Express) {
+export function mountMobile(app: Express, accessCode?: string) {
   app.get('/api/lan', (_req, res) => {
     res.json({ ips: lanIps() });
   });
 
-  app.post('/api/mobile/session', (_req, res) => {
+  app.post('/api/mobile/session', (req, res) => {
+    if (!checkAccess(accessCode, req.get(ACCESS_HEADER))) {
+      res.status(401).json(ACCESS_DENIED);
+      return;
+    }
     const id = crypto.randomUUID();
     sessions.set(id, { pcClients: new Set(), queue: [], seq: 0, phoneSeen: false, lastActive: Date.now() });
     res.json({ id });

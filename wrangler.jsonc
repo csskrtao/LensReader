@@ -1,0 +1,31 @@
+// Cloudflare Workers 部署配置：npm run deploy
+// 密钥不要写在这里，用命令设置：
+//   npx wrangler secret put OPENAI_API_KEY
+//   npx wrangler secret put OPENAI_BASE_URL   （OpenAI 官方可不设）
+//   npx wrangler secret put ACCESS_CODE
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lensreader",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "MOBILE", "class_name": "MobileSession" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MobileSession"] }],
+  "vars": {
+    // 识图模型，必须支持图片输入
+    "VISION_MODEL": "gpt-6-luna-max",
+    // 讲解 / 翻译模型
+    "TEXT_MODEL": "gpt-6-luna-max"
+  },
+  "observability": { "enabled": true },
+  // 自定义域名（域名需托管在 Cloudflare）
+  "routes": [{ "pattern": "lensreader.skrtao.de", "custom_domain": true }]
+}
