@@ -52,3 +52,5 @@ npm run deploy                              # 构建并部署，之后每次更�
 ```
 
 线上版扫码拍照直接使用当前域名，手机不需要和电脑连同一 WiFi。架构、域名配置、日常维护、访问口令和本地模拟等详细说明见 [docs/deploy-cloudflare.md](docs/deploy-cloudflare.md)。
+
+感谢 Linux.do 社区成员长期以来的支持与分享
