@@ -10,8 +10,10 @@ cp .env.example .env   # 已经有 .env 的话跳过
 npm run dev            # 打开 http://localhost:5173
 ```
 
-## 配置 `.env`
+<img width="2559" height="1407" alt="image" src="https://github.com/user-attachments/assets/f143479a-25db-4f41-8af0-b19073e40463" />
+<img width="2559" height="1347" alt="image" src="https://github.com/user-attachments/assets/6acf1fde-1632-480d-a24c-c1ca571543c3" />
 
+## 配置 `.env`
 | 变量 | 说明 |
 |---|---|
 | `OPENAI_BASE_URL` | OpenAI 兼容接口地址，OpenAI 官方留空 |
